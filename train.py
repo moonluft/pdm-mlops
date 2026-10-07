@@ -1,5 +1,4 @@
 """Train candidate models, track them in MLflow, register the best one as @production."""
-import inspect
 import json
 import os
 
@@ -13,7 +12,6 @@ from sklearn.metrics import average_precision_score, precision_score, recall_sco
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
-from sklearn.ensemble import ExtraTreesClassifier
 from xgboost import XGBClassifier
 
 from data import FEATURES, TARGET, make_data
@@ -36,6 +34,7 @@ MIN_PR_AUC = 0.6
 # HINT: on rare classes, we care about the overall ranking quality on the positive class.
 SELECT_BY = "pr_auc"
 
+
 def main():
     print("Loading data...")
     df = make_data()
@@ -48,7 +47,7 @@ def main():
     candidates = {
         "logistic_regression": make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000, random_state=42)),
         "random_forest": RandomForestClassifier(n_estimators=100, max_depth=8, random_state=42),
-        "xgboost": XGBClassifier(n_estimators=100, max_depth=6, learning_rate=0.1, random_state=42, eval_metric="logloss")
+        "xgboost": XGBClassifier(n_estimators=100, max_depth=6, learning_rate=0.1, random_state=42, eval_metric="logloss"),
     }
 
     best_score = -1.0
@@ -91,8 +90,6 @@ def main():
 
             # Log model with signature
             signature = mlflow.models.infer_signature(X_test, y_pred)
-            # Use skops trusted types safety warning
-            skops_opt = {"serialization_format": "pickle"}
             mlflow.sklearn.log_model(clf, "model", signature=signature, serialization_format="pickle")
 
             print(f"  {name:<20} | PR-AUC: {pr_auc:.3f} | Recall: {recall:.3f} | Precision: {precision:.3f}")
@@ -122,7 +119,7 @@ def main():
         "selected_by": SELECT_BY,
         "threshold": THRESHOLD,
         "min_pr_auc": MIN_PR_AUC,
-        **best_metrics
+        **best_metrics,
     }
     with open("metrics.json", "w") as f:
         json.dump(summary, f, indent=2)
@@ -137,6 +134,7 @@ def main():
     client = MlflowClient()
     client.set_registered_model_alias(model_name, "production", mv.version)
     print(f"Registered model version {mv.version} and set alias @production")
+
 
 if __name__ == "__main__":
     main()
